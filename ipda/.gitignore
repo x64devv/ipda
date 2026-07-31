@@ -8,6 +8,9 @@ local.properties
 # never commit credentials
 secrets.properties
 *.token
-# local data snapshots (recorded by snapshot id, not by file)
-data/
-runs/
+# local data snapshots (recorded by snapshot id, not by file).
+# Anchored with a leading slash: only the project-root data/ and runs/
+# directories — an unanchored "data/" would also hide the ipda.data
+# SOURCE package (src/main/kotlin/ipda/data/) from git.
+/data/
+/runs/
