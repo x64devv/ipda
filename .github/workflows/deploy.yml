@@ -96,12 +96,12 @@ jobs:
           envs: GHCR_TOKEN,GHCR_USER,ENGINE_IMAGE
           script_stop: true
           script: |
+            set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             cd /opt/ipda
             docker compose pull
             docker pull "$ENGINE_IMAGE:latest"
             docker compose up -d
-            docker logout ghcr.io
             sleep 3
             docker compose ps
             echo "Running engine containers (restart from the manager UI to apply the new engine image):"
