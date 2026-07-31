@@ -82,7 +82,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    environment: production
+    environment: ipda
     steps:
       - name: Compute image names
         run: echo "ENGINE_IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ipda-live" >> "$GITHUB_ENV"
