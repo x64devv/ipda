@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row" style="justify-content: space-between;">
+  <h1 style="margin: 0;">Arm {{ d.name }} for LIVE trading</h1>
+  <a href="/d/{{ d.name }}">← back</a>
+</div>
+
+<div class="banner">
+  Arming lets this deployment start against <strong>live.ctraderapi.com with real money</strong>
+  (the engine's <code>--live</code> flag is passed only for armed deployments).
+  The evidence that should drive this decision is below — not a feeling about the last few trades.
+</div>
+
+<div class="card">
+  <h2>Forward demo evidence (all demo deployments)</h2>
+  {% if demo_stats %}
+  <table>
+    <tr><th>deployment</th><th>trades</th><th>cum R</th><th>PF (R)</th></tr>
+    {% for s in demo_stats %}
+    <tr>
+      <td>{{ s.name }}</td>
+      <td class="num">{{ s.n }}</td>
+      <td class="num {{ 'pos' if s.cum_r >= 0 else 'neg' }}">{{ '%+.1f' | format(s.cum_r) }}</td>
+      <td class="num">{{ '%.2f' | format(s.pf_r) if s.pf_r is not none else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="small" style="margin-top: 6px;">
+    Backtest reference (in-sample, FX pair set): PF 1.23, avgR +0.11, maxDD 17R, with 5+ loss
+    streaks roughly every 7 weeks and a 13-loss worst case. Forward demo should look like the same
+    distribution — after the slippage haircut (standing rule 5) — before real money sees it.
+  </div>
+  {% else %}
+  <div class="warnbox">No forward demo trades recorded yet. Arming now would mean going live on
+  backtest evidence alone — which the project's own protocol calls not deployment-grade.</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Confirm</h2>
+  <form method="post" action="/d/{{ d.name }}/arm">
+    <label>Type the live account id ({{ d.account_id or 'set it on the deployment page first' }})</label>
+    <input type="text" name="typed_account" autocomplete="off" required>
+    <div style="margin: 10px 0;">
+      <div class="row"><input type="checkbox" id="cr" name="confirm_risk">
+        <label for="cr" style="display:inline; margin:0;">I understand this trades real money automatically, including while I sleep.</label></div>
+      <div class="row"><input type="checkbox" id="cd" name="confirm_data">
+        <label for="cd" style="display:inline; margin:0;">I have reviewed the forward demo results above against the backtest distribution.</label></div>
+    </div>
+    <button class="danger">Arm live trading</button>
+  </form>
+</div>
+
+{% endblock %}

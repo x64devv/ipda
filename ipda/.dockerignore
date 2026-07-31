@@ -1,0 +1,11 @@
+# Keep the build context small — and keep credentials/data OUT of images.
+secrets.properties
+*.token
+data/
+runs/
+build/
+.gradle/
+.kotlin/
+.idea/
+out/
+*.iml

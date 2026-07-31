@@ -1,0 +1,17 @@
+# Line-ending discipline — two things here are byte-sensitive:
+#
+# 1. config JSON: the CONFIG HASH is sha256 of the file bytes (run identity).
+#    Git must never normalize line endings in these files on any platform.
+# 2. gradlew: executed by sh inside the Linux Docker build — must stay LF.
+#
+*.json -text
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.kt text
+*.kts text
+*.md text
+*.yml text eol=lf
+*.py text eol=lf
+*.html text
+*.properties text

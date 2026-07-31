@@ -1,0 +1,36 @@
+# Server-side compose — lives at /opt/ipda/docker-compose.yml.
+#
+# Compose runs ONLY the management plane. Engine containers (one per
+# deployment: ipda-<name>) are created and controlled BY the manager over the
+# docker socket, from $ENGINE_IMAGE, each mounting its own deployment
+# directory /opt/ipda/deployments/<name> at /data.
+#
+# The manager is bound to 127.0.0.1 — reach it over an SSH tunnel:
+#   ssh -L 8642:127.0.0.1:8642 user@server   →  http://localhost:8642
+#
+# Replace OWNER (lowercase GitHub username) and set a real MANAGER_PASSWORD.
+#
+# Engine image updates: a deploy pulls the new image but does NOT restart
+# running engines — you apply it per deployment with the manager's Restart
+# button. No surprise mid-trade engine swaps.
+
+services:
+  manager:
+    image: ghcr.io/OWNER/ipda-manager:latest
+    container_name: ipda-manager
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8642:8000"
+    environment:
+      - IPDA_ROOT=/ipda
+      - HOST_IPDA_ROOT=/opt/ipda
+      - ENGINE_IMAGE=ghcr.io/OWNER/ipda-live:latest
+      - MANAGER_PASSWORD=CHANGE_ME
+    volumes:
+      - /opt/ipda:/ipda
+      - /var/run/docker.sock:/var/run/docker.sock
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,4 @@
+# Repo root. The Gradle project keeps its own ipda/.gitignore
+# (secrets.properties, data/, runs/, build/ are excluded there).
+archive/
+*.zip

@@ -1,0 +1,54 @@
+{
+    "configVersion": 1,
+    "instruments": [
+        "EURUSD",
+        "GBPUSD"
+    ],
+    "biasTimeframe": "H1",
+    "entryTimeframe": "M15",
+    "displacement": {
+        "timeframe": "H1",
+        "k1": 2.0,
+        "atrPeriod": 20,
+        "atrMethod": "SMA",
+        "bodyRatio": 0.65,
+        "speedCapEnabled": true,
+        "speedCapCandles": 4
+    },
+    "swings": {
+        "wing": 2
+    },
+    "sessions": [
+        {
+            "name": "ASIA",
+            "zone": "America/New_York",
+            "start": "20:00",
+            "end": "00:00"
+        },
+        {
+            "name": "LONDON_KZ",
+            "zone": "Europe/London",
+            "start": "07:00",
+            "end": "10:00"
+        },
+        {
+            "name": "NY_KZ",
+            "zone": "America/New_York",
+            "start": "07:00",
+            "end": "10:00"
+        },
+        {
+            "name": "LONDON_CLOSE",
+            "zone": "Europe/London",
+            "start": "15:00",
+            "end": "17:00"
+        }
+    ],
+    "dailyBoundaryZone": "America/New_York",
+    "execution": {
+        "executionTimeframe": "M15"
+    },
+    "baseline": {
+        "entryMode": "FVG_MIDPOINT_LIMIT"
+    }
+}

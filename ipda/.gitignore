@@ -1,0 +1,13 @@
+.gradle/
+build/
+out/
+*.iml
+.idea/
+.kotlin/
+local.properties
+# never commit credentials
+secrets.properties
+*.token
+# local data snapshots (recorded by snapshot id, not by file)
+data/
+runs/

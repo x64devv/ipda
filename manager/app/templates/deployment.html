@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row" style="justify-content: space-between;">
+  <div class="row">
+    <h1 style="margin: 0;">{{ d.name }}</h1>
+    <span class="badge {{ 'live' if d.is_live else 'demo' }}">{{ 'LIVE' if d.is_live else 'DEMO' }}</span>
+    <span class="badge {{ 'state-running' if state == 'running' else 'state-other' }}">{{ state }}</span>
+  </div>
+  <a href="/">← dashboard</a>
+</div>
+
+{% if d.is_live and not d.is_armed %}
+  <div class="banner">
+    This deployment targets <strong>live.ctraderapi.com (real money)</strong> but is <strong>not armed</strong> —
+    it cannot start until you confirm on the <a href="/d/{{ d.name }}/arm">arm page</a>.
+    The engine independently refuses the live host without its <code>--live</code> flag.
+  </div>
+{% endif %}
+
+<form method="post" action="/d/{{ d.name }}">
+<div class="card">
+  <h2>Trading setup</h2>
+  <div class="cols">
+    <div>
+      <label>Mode</label>
+      <select name="mode">
+        <option value="demo" {{ 'selected' if not d.is_live }}>demo — FxPro demo account</option>
+        <option value="live" {{ 'selected' if d.is_live }}>live — REAL MONEY (requires arming)</option>
+      </select>
+      <div class="small">Changing mode always disarms; re-confirm deliberately.</div>
+
+      <label>Account id (ctidTraderAccountId)</label>
+      <input type="text" name="account_id" value="{{ d.account_id }}" placeholder="e.g. 48042139">
+
+      <label>Default lot size</label>
+      <input type="number" name="volume_lots" step="0.01" min="0.01" value="{{ d.volume_lots }}">
+    </div>
+    <div>
+      <label>Instruments &amp; per-symbol lots (blank = default)</label>
+      {% for s, params in known.items() %}
+        <div class="row" style="margin: 4px 0;">
+          <input type="checkbox" id="sym_{{ s }}" name="sym_{{ s }}" {{ 'checked' if s in d.instruments }}>
+          <label for="sym_{{ s }}" style="display:inline; margin:0;">{{ s }}</label>
+          <input type="number" name="lots_{{ s }}" step="0.01" min="0.01" style="width: 90px;"
+                 value="{{ d.volume_lots_by_symbol.get(s, '') }}" placeholder="lots">
+          <span class="small">spread {{ params.spreadPips }}p</span>
+        </div>
+        {% if s in warnings %}
+          <div class="warnbox">⚠ {{ warnings[s] }}</div>
+        {% endif %}
+      {% endfor %}
+      <label>Notes</label>
+      <textarea name="notes" rows="2" style="width: 100%;">{{ d.notes }}</textarea>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Credentials — {{ 'live.ctraderapi.com' if d.is_live else 'demo.ctraderapi.com' }}</h2>
+  <div class="small" style="margin-bottom: 6px;">
+    Stored values are never displayed. Leave a field blank to keep it. The engine refreshes tokens
+    in-protocol and persists them back to this deployment's secrets file.
+  </div>
+  <div class="cols">
+    <div>
+      <label>clientId {{ '· set' if secrets_present.clientId }}</label>
+      <input type="password" name="clientId" autocomplete="off">
+      <label>clientSecret {{ '· set' if secrets_present.clientSecret }}</label>
+      <input type="password" name="clientSecret" autocomplete="off">
+    </div>
+    <div>
+      <label>accessToken {{ '· set' if secrets_present.accessToken }}</label>
+      <input type="password" name="accessToken" autocomplete="off">
+      <label>refreshToken {{ '· set' if secrets_present.refreshToken }}</label>
+      <input type="password" name="refreshToken" autocomplete="off">
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <button>Save (re-renders config)</button>
+  <span class="small">config hash: <span class="num">{{ hash or 'not rendered yet' }}</span></span>
+</div>
+</form>
+
+<div class="card" style="margin-top: 14px;">
+  <h2>Run control</h2>
+  <div class="row">
+    <form class="inline" method="post" action="/d/{{ d.name }}/action">
+      <input type="hidden" name="act" value="start"><button {% if not docker_ok %}disabled{% endif %}>Start</button>
+    </form>
+    <form class="inline" method="post" action="/d/{{ d.name }}/action">
+      <input type="hidden" name="act" value="restart"><button class="secondary" {% if not docker_ok %}disabled{% endif %}>Restart</button>
+    </form>
+    <form class="inline" method="post" action="/d/{{ d.name }}/action">
+      <input type="hidden" name="act" value="stop"><button class="secondary" {% if not docker_ok %}disabled{% endif %}>Stop</button>
+    </form>
+    {% if d.is_live %}
+      {% if d.is_armed %}
+        <form class="inline" method="post" action="/d/{{ d.name }}/disarm"><button class="danger">Disarm live</button></form>
+        <span class="small">armed {{ d.armed.armedAt }}</span>
+      {% else %}
+        <a href="/d/{{ d.name }}/arm"><button class="danger" type="button">Arm live…</button></a>
+      {% endif %}
+    {% endif %}
+  </div>
+  <div class="small" style="margin-top: 6px;">
+    Stop sends SIGTERM: open state is logged, the summary is written, and open positions stay
+    under their server-side bracket; the next start adopts them via reconcile.
+  </div>
+  <h2>Container log (tail)</h2>
+  <pre class="log">{{ container_logs }}</pre>
+  {% if st.summary_text %}
+    <h2>Latest summary — {{ st.newest_run }}</h2>
+    <pre class="log">{{ st.summary_text }}</pre>
+  {% endif %}
+</div>
+
+{% endblock %}

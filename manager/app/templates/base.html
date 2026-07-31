@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ipda manager</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb; --card: #ffffff; --border: #e4e3df;
+    --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #8a8984;
+    --series-1: #2a78d6;
+    --good: #008300; --bad: #c62f2f; --warn-bg: #fff7e6; --warn-bd: #eda100;
+    --live: #c62f2f; --demo: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface: #1a1a19; --card: #232322; --border: #3a3936;
+      --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8a8984;
+      --series-1: #3987e5;
+      --good: #4caf50; --bad: #e66767; --warn-bg: #33290f; --warn-bd: #c98500;
+      --live: #e66767; --demo: #3987e5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 18px; } h2 { font-size: 15px; margin: 18px 0 8px; }
+  a { color: var(--series-1); text-decoration: none; }
+  .banner { background: var(--warn-bg); border: 1px solid var(--warn-bd);
+            border-radius: 6px; padding: 8px 12px; margin-bottom: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border);
+          border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 14px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .muted { color: var(--ink-2); } .small { font-size: 12px; color: var(--ink-3); }
+  .badge { font-size: 11px; font-weight: 600; letter-spacing: .04em; padding: 2px 8px;
+           border-radius: 10px; border: 1px solid; }
+  .badge.live { color: var(--live); border-color: var(--live); }
+  .badge.demo { color: var(--demo); border-color: var(--demo); }
+  .badge.state-running { color: var(--good); border-color: var(--good); }
+  .badge.state-other { color: var(--ink-3); border-color: var(--ink-3); }
+  .num { font-variant-numeric: tabular-nums; }
+  .pos { color: var(--good); } .neg { color: var(--bad); }
+  table { border-collapse: collapse; width: 100%; }
+  th { text-align: left; font-size: 12px; color: var(--ink-2); font-weight: 600;
+       border-bottom: 1px solid var(--border); padding: 4px 8px 4px 0; }
+  td { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); }
+  input[type=text], input[type=password], input[type=number], textarea, select {
+    background: var(--card); color: var(--ink); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 8px; font: inherit; }
+  button { background: var(--series-1); color: #fff; border: 0; border-radius: 6px;
+           padding: 7px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink-2);
+                     border: 1px solid var(--border); }
+  button.danger { background: var(--live); }
+  form.inline { display: inline; }
+  .spark-line { fill: none; stroke: var(--series-1); stroke-width: 2;
+                stroke-linejoin: round; stroke-linecap: round; }
+  .spark-zero { stroke: var(--border); stroke-width: 1; }
+  label { display: block; margin: 8px 0 2px; color: var(--ink-2); font-size: 13px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  pre.log { background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+            padding: 10px; font-size: 12px; overflow-x: auto; max-height: 260px; }
+  .warnbox { color: var(--warn-bd); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="row" style="justify-content: space-between; margin-bottom: 6px;">
+    <h1><a href="/" style="color: inherit;">ipda manager</a></h1>
+    <span class="small">deterministic engine · manager never in the hot path</span>
+  </div>
+  {% if no_password %}
+    <div class="banner">No <code>MANAGER_PASSWORD</code> set — the UI is unauthenticated. Set it in the compose file.</div>
+  {% endif %}
+  {% if not docker_ok %}
+    <div class="banner">Docker socket unreachable — status and start/stop are disabled (read-only mode).</div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

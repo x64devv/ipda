@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row" style="justify-content: space-between;">
+  <h1 style="margin: 0;">{{ d.name }} — recent events</h1>
+  <a href="/d/{{ d.name }}">← back</a>
+</div>
+<div class="card">
+  <table>
+    <tr><th>type</th><th>payload</th></tr>
+    {% for e in events | reverse %}
+    <tr><td class="small" style="white-space: nowrap;">{{ e.type }}</td>
+        <td class="small num" style="word-break: break-all;">{{ e.payload | tojson }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

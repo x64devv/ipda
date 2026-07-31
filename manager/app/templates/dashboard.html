@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="grid">
+  {% for c in cards %}
+  <div class="card">
+    <div class="row" style="justify-content: space-between;">
+      <div class="row">
+        <strong><a href="/d/{{ c.d.name }}">{{ c.d.name }}</a></strong>
+        <span class="badge {{ 'live' if c.d.is_live else 'demo' }}">{{ 'LIVE' if c.d.is_live else 'DEMO' }}</span>
+        {% if c.d.is_live and not c.d.is_armed %}<span class="warnbox">not armed</span>{% endif %}
+        <span class="badge {{ 'state-running' if c.state == 'running' else 'state-other' }}">{{ c.state }}</span>
+      </div>
+      <span class="small">config {{ c.hash }}…</span>
+    </div>
+
+    <div class="row" style="margin-top: 8px; justify-content: space-between;">
+      <div>
+        <div class="small">{{ c.d.instruments | join(' · ') }} — {{ c.d.volume_lots }} lots{% if c.d.volume_lots_by_symbol %} ({{ c.d.volume_lots_by_symbol }}){% endif %}</div>
+        <div class="num" style="font-size: 20px; margin-top: 4px;">
+          <span class="{{ 'pos' if c.st.cum_r >= 0 else 'neg' }}">{{ '%+.1f' | format(c.st.cum_r) }}R</span>
+          <span class="muted" style="font-size: 13px;">
+            over {{ c.st.trades | length }} trades{% if c.st.pf_r is not none %} · PF {{ '%.2f' | format(c.st.pf_r) }}{% endif %}
+          </span>
+        </div>
+        {% if c.st.heartbeat_age_s is not none %}
+          <div class="small">last event {{ '%d' | format(c.st.heartbeat_age_s // 60) }} min ago</div>
+        {% else %}
+          <div class="small">no run artifacts yet</div>
+        {% endif %}
+      </div>
+      <div>{{ c.spark | safe }}</div>
+    </div>
+
+    {% if c.st.open_positions %}
+      <div class="small" style="margin-top: 6px;">
+        open:
+        {% for p in c.st.open_positions %}
+          {{ p.symbol }} {{ p.side }}{% if p.adopted %} (adopted){% endif %}{{ "," if not loop.last }}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="row" style="margin-top: 10px;">
+      <form class="inline" method="post" action="/d/{{ c.d.name }}/action">
+        <input type="hidden" name="act" value="start"><button {% if not docker_ok %}disabled{% endif %}>Start</button>
+      </form>
+      <form class="inline" method="post" action="/d/{{ c.d.name }}/action">
+        <input type="hidden" name="act" value="stop"><button class="secondary" {% if not docker_ok %}disabled{% endif %}>Stop</button>
+      </form>
+      <a class="small" href="/d/{{ c.d.name }}/events">events</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>New deployment</h2>
+  <form method="post" action="/new" class="row">
+    <input type="text" name="name" placeholder="e.g. fx-demo, fx-live" pattern="[a-z0-9][a-z0-9-]{1,30}" required>
+    <button>Create</button>
+  </form>
+  <div class="small" style="margin-top: 6px;">
+    A deployment = one account + one instrument set + one config (its own run identity), one engine container.
+    Demo and live run side by side as separate deployments.
+  </div>
+</div>
+
+{% endblock %}
