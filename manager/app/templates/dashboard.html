@@ -23,11 +23,15 @@
             over {{ c.st.trades | length }} trades{% if c.st.pf_r is not none %} · PF {{ '%.2f' | format(c.st.pf_r) }}{% endif %}
           </span>
         </div>
-        {% if c.st.heartbeat_age_s is not none %}
-          <div class="small">last event {{ '%d' | format(c.st.heartbeat_age_s // 60) }} min ago</div>
-        {% else %}
-          <div class="small">no run artifacts yet</div>
-        {% endif %}
+        {% set hl, hm = c.st.health %}
+        <div class="small" style="margin-top: 4px;">
+          {% if hl == 'ok' %}
+            connected{% if c.st.heartbeat_age_s is not none %} · last event {{ '%d' | format(c.st.heartbeat_age_s // 60) }} min ago{% endif %}
+          {% else %}
+            <span class="warnbox">{{ {'fatal': 'FATAL', 'never': 'NEVER CONNECTED', 'flapping': 'RECONNECTING', 'idle': 'not started'}.get(hl, hl) }}</span>
+            {{ hm }}
+          {% endif %}
+        </div>
       </div>
       <div>{{ c.spark | safe }}</div>
     </div>

@@ -13,6 +13,8 @@ import com.xtrader.protocol.openapi.v2.model.ProtoOATradeSide
 import ipda.broker.Side
 import ipda.config.IpdaConfig
 import ipda.ctrader.CTraderClient
+import ipda.ctrader.FatalConfigException
+import ipda.ctrader.accountGrantHelp
 import ipda.ctrader.LiveConnection
 import ipda.ctrader.OpenApiConnection
 import ipda.ctrader.OpenApiErrorException
@@ -69,6 +71,14 @@ class LiveSession(
     @Volatile
     private var currentConn: LiveConnection? = null
 
+    /**
+     * Set when the loop hits a misconfiguration that retrying cannot fix;
+     * rethrown out of [run] so the process exits non-zero (see
+     * [FatalConfigException]).
+     */
+    @Volatile
+    private var fatal: FatalConfigException? = null
+
     /** Set after first successful account auth; used for artifact stamping. */
     @Volatile
     var accountId: Long? = null
@@ -93,11 +103,24 @@ class LiveSession(
                     eventLog.append("live_disconnect", """{"cause":"stream ended"}""")
                     sleepInterruptibly(backoffSec * 1000)
                 }
+            } catch (e: FatalConfigException) {
+                // NOT a disconnect. Reconnecting cannot fix a wrong account
+                // id or a missing symbol, and looping on one is worse than
+                // failing: each retry appends an event, so the manager's
+                // heartbeat reads HEALTHY while nothing trades (31 Jul – 4
+                // Aug 2026, four days lost). Record once, stop, and let it
+                // out of run() so the process dies visibly.
+                fatal = e
+                stopped = true
+                eventLog.append(
+                    "live_fatal",
+                    """{"at":"${Instant.ofEpochMilli(clock())}","cause":${jsonString(e.message ?: "FatalConfigException")}}"""
+                )
             } catch (e: Exception) {
                 if (stopped) break
                 eventLog.append(
                     "live_disconnect",
-                    """{"cause":"${(e.message ?: e.javaClass.simpleName).replace("\"", "'")}","backoffSeconds":$backoffSec}"""
+                    """{"cause":${jsonString(e.message ?: e.javaClass.simpleName)},"backoffSeconds":$backoffSec}"""
                 )
                 sleepInterruptibly(backoffSec * 1000)
                 backoffSec = minOf(backoffSec * 2, cfg.live.reconnectMaxBackoffSeconds)
@@ -107,6 +130,7 @@ class LiveSession(
                 currentConn = null
             }
         }
+        fatal?.let { throw it }
     }
 
     fun stop() {
@@ -138,14 +162,19 @@ class LiveSession(
             refreshTokens(client)
             client.accountsByToken(secrets.accessToken)
         }
-        require(accounts.isNotEmpty()) { "Access token grants no accounts" }
+        if (accounts.isEmpty()) throw FatalConfigException(
+            "Access token grants no accounts — re-issue the token with the accounts scope."
+        )
         val chosen = accountOverride
             ?: secrets.accountId
             ?: accounts.first { !(it.hasIsLive() && it.isLive) }.ctidTraderAccountId
         val acct = accounts.firstOrNull { it.ctidTraderAccountId == chosen }
-            ?: error("Account $chosen not in token grant list: ${accounts.map { it.ctidTraderAccountId }}")
-        require(!(acct.hasIsLive() && acct.isLive) || host == OpenApiConnection.LIVE_HOST) {
-            "Account $chosen is LIVE but host is demo — refusing (environments are isolated)."
+            ?: throw FatalConfigException(accountGrantHelp(accounts, chosen))
+        if ((acct.hasIsLive() && acct.isLive) && host != OpenApiConnection.LIVE_HOST) {
+            throw FatalConfigException(
+                "Account $chosen is a LIVE account but the configured host is $host — " +
+                    "refusing (environments are isolated)."
+            )
         }
         try {
             client.accountAuth(chosen, secrets.accessToken)
@@ -162,13 +191,18 @@ class LiveSession(
         }
         eventLog.append(
             "live_connected",
-            """{"host":"$host","account":$chosen,"label":"${accountLabel}"}"""
+            """{"at":"${Instant.ofEpochMilli(clock())}","host":"$host","account":$chosen,"label":${jsonString(accountLabel ?: "")}}"""
         )
 
         // Symbols for the configured instruments only.
         val allSymbols = client.symbolIdsByName(chosen)
         val symbolIdByName = cfg.instruments.associateWith { instrument ->
-            allSymbols[instrument.uppercase()] ?: error("Symbol $instrument not found on account $chosen")
+            allSymbols[instrument.uppercase()] ?: throw FatalConfigException(
+                "Symbol $instrument is not tradable on account $chosen. " +
+                    "Available (first 40): " +
+                    allSymbols.keys.sorted().take(40).joinToString(", ") +
+                    if (allSymbols.size > 40) ", … (${allSymbols.size} total)" else ""
+            )
         }
         val symbolNameById = symbolIdByName.entries.associate { (k, v) -> v to k }
 
@@ -412,4 +446,23 @@ class CTraderGateway(
             .build()
         conn.send(ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ_VALUE, req)
     }
+}
+
+/**
+ * Minimal JSON string escaper. The old inline `.replace("\"", "'")` was fine
+ * for one-line socket errors but silently produces invalid JSON for anything
+ * containing a newline — and [FatalConfigException] messages are deliberately
+ * multi-line.
+ */
+private fun jsonString(s: String): String = buildString {
+    append('"')
+    for (c in s) when (c) {
+        '"' -> append("\\\"")
+        '\\' -> append("\\\\")
+        '\n' -> append("\\n")
+        '\r' -> append("\\r")
+        '\t' -> append("\\t")
+        else -> if (c < ' ') append("\\u%04x".format(c.code)) else append(c)
+    }
+    append('"')
 }

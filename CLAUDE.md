@@ -344,6 +344,24 @@ request considered and PARKED per the decision table (contract model
 distorts validation; synthetics contradict the liquidity premise) — a Deriv
 adapter would be a new Feed/BrokerAdapter + full re-measurement.
 
+**DEPLOYED TO PRODUCTION SERVER (31 Jul 2026).** Repo: github.com/x64devv/ipda
+(PRIVATE; root = ProjectA0IK; secrets verified absent). Pipeline green
+end-to-end: test → build+push (ghcr.io/x64devv/ipda-live + ipda-manager) →
+SSH deploy; secrets live in the GitHub environment **`ipda`** (deploy job
+must reference `environment: ipda`). Server: existing production box
+(srv1282688, shared with other services) — manager at /opt/ipda behind the
+box's nginx-proxy + acme-companion (VIRTUAL_HOST/LETSENCRYPT_HOST, TLS +
+basic auth; no host port). Setup lessons burned into the repo: repo must be
+rooted at ProjectA0IK (not ipda/); `git update-index --chmod=+x ipda/gradlew`
+(Windows drops the exec bit; Docker build needs it); ipda/.gitignore
+anchors `/data/` and `/runs/` (unanchored `data/` hid the ipda.data source
+package); deploy script has `set -e` and NO `docker logout` (the box's other
+services share the GHCR login); `.github/workflows/` is UNWRITABLE via
+remote tools — user edits it locally. Engine images apply via per-deployment
+Restart in the manager UI. Next: create fx-demo deployment in the manager,
+accumulate forward demo data; rotate cTrader tokens (they appeared in dev
+screenshots).
+
 **Concurrent per-instrument live sessions hardened (30 Jul 2026, 116/116
 tests).** The "split executors" model: each instrument class runs as its OWN
 live process with its OWN config (`gradlew live --args="--config

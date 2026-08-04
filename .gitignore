@@ -2,3 +2,7 @@
 # (secrets.properties, data/, runs/, build/ are excluded there).
 archive/
 *.zip
+
+# build/transfer archives — never commit
+*.tgz
+*.tar.gz

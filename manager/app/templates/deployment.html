@@ -18,6 +18,24 @@
   </div>
 {% endif %}
 
+{% set hl, hm = st.health %}
+{% if hl == 'fatal' %}
+  <div class="banner">
+    <strong>Stopped on a configuration error.</strong> The engine refused to retry, because retrying
+    cannot fix this — fix the setting below, then <strong>Restart</strong>.
+    <pre class="log" style="margin-top: 8px;">{{ st.fatal.cause }}</pre>
+  </div>
+{% elif hl == 'never' %}
+  <div class="banner">
+    <strong>This run has never authenticated.</strong> {{ hm }}
+    It is producing no trades and no spread samples — elapsed time is <em>not</em> forward-test data.
+  </div>
+{% elif hl == 'flapping' %}
+  <div class="banner">
+    <strong>Reconnecting repeatedly.</strong> {{ hm }}
+  </div>
+{% endif %}
+
 <form method="post" action="/d/{{ d.name }}">
 <div class="card">
   <h2>Trading setup</h2>

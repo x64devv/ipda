@@ -2,6 +2,8 @@ package ipda.fetch
 
 import ipda.config.ConfigLoader
 import ipda.ctrader.CTraderClient
+import ipda.ctrader.FatalConfigException
+import ipda.ctrader.accountGrantHelp
 import ipda.ctrader.OpenApiConnection
 import ipda.data.SnapshotStore
 import ipda.model.Timeframe
@@ -65,7 +67,7 @@ fun main(args: Array<String>) {
             ?: secrets.getProperty("accountId")?.toLongOrNull()
             ?: accounts.first { !(it.hasIsLive() && it.isLive) }.ctidTraderAccountId
         val acct = accounts.firstOrNull { it.ctidTraderAccountId == chosen }
-            ?: error("Account $chosen not in token grant list: ${accounts.map { it.ctidTraderAccountId }}")
+            ?: throw FatalConfigException(accountGrantHelp(accounts, chosen))
         require(!(acct.hasIsLive() && acct.isLive) || host == OpenApiConnection.LIVE_HOST) {
             "Account $chosen is LIVE but host is demo — refusing (environments are isolated)."
         }

@@ -3,6 +3,7 @@ package ipda.live
 import ipda.backtest.BaselineDisplacementStrategy
 import ipda.backtest.CODE_VERSION
 import ipda.config.ConfigLoader
+import ipda.ctrader.FatalConfigException
 import ipda.detect.SessionTagger
 import ipda.log.JsonlEventLog
 import java.nio.file.Files
@@ -167,7 +168,22 @@ fun main(args: Array<String>) {
     println()
 
     writeSummary(null)
-    engine.run(session) // blocks until Ctrl-C
+
+    // Blocks until Ctrl-C. The ONE thing that comes back out is a
+    // misconfiguration the reconnect loop refused to retry — surface it on
+    // stderr and exit non-zero so the container is marked failed rather than
+    // sitting in a restart loop that looks alive (see FatalConfigException).
+    try {
+        engine.run(session)
+    } catch (e: FatalConfigException) {
+        System.err.println()
+        System.err.println("FATAL CONFIGURATION ERROR — the live loop stopped and will not retry:")
+        System.err.println()
+        System.err.println(e.message)
+        System.err.println()
+        System.err.println("Fix the deployment configuration, then Restart. Artifacts: ${runDir.toAbsolutePath()}")
+        kotlin.system.exitProcess(3)
+    }
 }
 
 private fun argValue(args: Array<String>, name: String): String? {

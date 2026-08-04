@@ -32,6 +32,16 @@ class DeploymentStatus:
     spread_means: dict[str, float] = field(default_factory=dict)
     summary_text: str | None = None
 
+    # Connection health (added 4 Aug 2026). A deployment that never
+    # authenticates still appends a live_disconnect event every backoff
+    # interval, so heartbeat_age_s alone reported the dead 31 Jul run as
+    # healthy for four days. Liveness is "did it ever connect", not "is the
+    # file being written".
+    last_connected_at: str | None = None      # ISO, from the live_connected event
+    fatal: dict | None = None                 # payload of live_fatal, if any
+    last_disconnect: dict | None = None       # payload of the most recent live_disconnect
+    disconnects_since_connect: int = 0
+
     # derived
     @property
     def cum_r(self) -> float:
@@ -58,6 +68,34 @@ class DeploymentStatus:
         if self.last_event_ts is None:
             return None
         return max(0.0, time.time() - self.last_event_ts)
+
+    @property
+    def ever_connected(self) -> bool:
+        return self.last_connected_at is not None
+
+    @property
+    def health(self) -> tuple[str, str]:
+        """(level, human message) — level in fatal | never | flapping | idle | ok.
+
+        Deliberately independent of heartbeat freshness: a retry loop keeps
+        the heartbeat fresh while trading nothing.
+        """
+        if self.fatal:
+            return "fatal", (self.fatal.get("cause") or "fatal configuration error").split("\n")[0]
+        if not self.run_dirs:
+            return "idle", "no run artifacts yet — deployment has never been started"
+        if not self.ever_connected:
+            cause = (self.last_disconnect or {}).get("cause")
+            msg = "never authenticated in this run"
+            if cause:
+                msg += f" — {str(cause).split(chr(10))[0]}"
+            return "never", msg
+        if self.disconnects_since_connect >= 3:
+            return "flapping", (
+                f"{self.disconnects_since_connect} disconnects since the last successful "
+                f"connect (last connected {self.last_connected_at})"
+            )
+        return "ok", f"connected {self.last_connected_at}"
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -95,6 +133,11 @@ def load_status(deployment_dir: Path) -> DeploymentStatus:
     if ev_file.exists():
         st.last_event_ts = ev_file.stat().st_mtime
 
+    # Parse the newest run's event log ONCE — it is the largest artifact
+    # (a leg_eval and a spread_sample per execution-TF close, per symbol)
+    # and three separate passes over it was already two too many.
+    ev_records = _read_jsonl(ev_file)
+
     # Trades across every run, in exit order (adopted trades included: they
     # carry adopted=true and r=null and simply don't move the R curve).
     for d in run_dirs:
@@ -102,10 +145,24 @@ def load_status(deployment_dir: Path) -> DeploymentStatus:
             st.trades.append(rec.get("payload", {}))
     st.trades.sort(key=lambda t: t.get("exitTime") or "")
 
+    # Connection health from the newest run: the last successful auth, any
+    # fatal stop, and how many disconnects have piled up since that auth.
+    for rec in ev_records:
+        typ, p = rec.get("type"), rec.get("payload", {})
+        if typ == "live_connected":
+            st.last_connected_at = p.get("at") or "(no timestamp)"
+            st.disconnects_since_connect = 0
+            st.last_disconnect = None
+        elif typ == "live_disconnect":
+            st.last_disconnect = p
+            st.disconnects_since_connect += 1
+        elif typ == "live_fatal":
+            st.fatal = p
+
     # Open positions from the NEWEST run only (restart adoption re-logs them).
     open_map: dict[int, OpenPosition] = {}
     pending_symbol_fills: dict[str, OpenPosition] = {}
-    for rec in _read_jsonl(ev_file):
+    for rec in ev_records:
         typ, p = rec.get("type"), rec.get("payload", {})
         if typ == "live_fill":
             pos = OpenPosition(
@@ -133,7 +190,7 @@ def load_status(deployment_dir: Path) -> DeploymentStatus:
 
     # Spread means from the newest run's spread_sample events.
     sums: dict[str, list[float]] = {}
-    for rec in _read_jsonl(ev_file):
+    for rec in ev_records:
         if rec.get("type") == "spread_sample":
             p = rec.get("payload", {})
             s = p.get("symbol")
